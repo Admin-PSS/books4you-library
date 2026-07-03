@@ -25,3 +25,4 @@ python fetch_thumbnails.py <YOUR_AZURE_APP_CLIENT_ID>
 
 This resumes safely if interrupted — it skips thumbnails already present in `thumbnails/`.
 
+
