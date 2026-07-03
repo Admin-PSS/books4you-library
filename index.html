@@ -1,0 +1,321 @@
+<title>Books4You Library</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f4f2;
+    --card-bg: #ffffff;
+    --text: #1b1b1b;
+    --muted: #6b6b6b;
+    --accent: #7a4f2e;
+    --border: #e2ddd6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #171512;
+      --card-bg: #221f1c;
+      --text: #f0ede8;
+      --muted: #a49c92;
+      --accent: #d9a86c;
+      --border: #322d27;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", "Noto Sans Myanmar", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg);
+    padding: 1.25rem 1.5rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  h1 {
+    margin: 0 0 0.75rem;
+    font-size: 1.4rem;
+  }
+  .meta {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+  }
+  #search {
+    width: 100%;
+    max-width: 28rem;
+    padding: 0.6rem 0.9rem;
+    font-size: 1rem;
+    border-radius: 0.6rem;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text);
+  }
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    height: calc(100vh - 5.5rem);
+  }
+  aside {
+    width: 240px;
+    flex-shrink: 0;
+    height: 100%;
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+    padding: 0.75rem 0;
+  }
+  #authorList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  #authorList li {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.45rem 1rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    color: var(--text);
+    border-left: 3px solid transparent;
+  }
+  #authorList li:hover {
+    background: var(--card-bg);
+  }
+  #authorList li.active {
+    border-left-color: var(--accent);
+    background: var(--card-bg);
+    font-weight: 600;
+    color: var(--accent);
+  }
+  #authorList .badge {
+    color: var(--muted);
+    font-weight: 400;
+    font-size: 0.78rem;
+  }
+  main {
+    flex: 1;
+    height: 100%;
+    overflow-y: auto;
+    padding: 1.5rem;
+  }
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1.1rem;
+  }
+  a.card {
+    display: flex;
+    flex-direction: column;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    overflow: hidden;
+    text-decoration: none;
+    color: var(--text);
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+  }
+  a.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  }
+  .cover {
+    aspect-ratio: 3 / 4;
+    background: var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .cover .placeholder {
+    color: var(--muted);
+    font-size: 0.75rem;
+    text-align: center;
+    padding: 0.5rem;
+  }
+  .info {
+    padding: 0.5rem 0.6rem 0.7rem;
+  }
+  .title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1.25;
+    margin: 0 0 0.2rem;
+  }
+  .author {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin: 0;
+  }
+  #empty {
+    display: none;
+    color: var(--muted);
+    padding: 2rem;
+    text-align: center;
+  }
+  #count {
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+</style>
+
+<header>
+  <h1>Books4You Library</h1>
+  <input id="search" type="text" placeholder="Search by title or author..." autocomplete="off" />
+  <div class="meta"><span id="count"></span></div>
+</header>
+
+<div class="layout">
+  <aside>
+    <ul id="authorList"></ul>
+  </aside>
+  <main>
+    <div id="grid"></div>
+    <div id="empty">No books match your search.</div>
+  </main>
+</div>
+
+<script>
+  const grid = document.getElementById("grid");
+  const search = document.getElementById("search");
+  const empty = document.getElementById("empty");
+  const countEl = document.getElementById("count");
+  const authorListEl = document.getElementById("authorList");
+
+  let books = [];
+  let selectedAuthor = null;
+
+  function authorKey(b) {
+    return b.author_mm || b.author_en || "Unknown";
+  }
+
+  function buildAuthorList() {
+    const counts = new Map();
+    for (const b of books) {
+      const key = authorKey(b);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    const authors = [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0], "my"));
+
+    authorListEl.innerHTML = "";
+
+    const allLi = document.createElement("li");
+    allLi.textContent = "All Authors";
+    const allBadge = document.createElement("span");
+    allBadge.className = "badge";
+    allBadge.textContent = books.length;
+    allLi.appendChild(allBadge);
+    allLi.addEventListener("click", () => {
+      selectedAuthor = null;
+      updateActiveAuthor();
+      applyFilter();
+    });
+    authorListEl.appendChild(allLi);
+
+    for (const [name, count] of authors) {
+      const li = document.createElement("li");
+      li.dataset.author = name;
+      const label = document.createElement("span");
+      label.textContent = name;
+      const badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = count;
+      li.appendChild(label);
+      li.appendChild(badge);
+      li.addEventListener("click", () => {
+        selectedAuthor = name;
+        updateActiveAuthor();
+        applyFilter();
+      });
+      authorListEl.appendChild(li);
+    }
+    updateActiveAuthor();
+  }
+
+  function updateActiveAuthor() {
+    for (const li of authorListEl.children) {
+      const isAll = !li.dataset.author;
+      const isMatch = selectedAuthor ? li.dataset.author === selectedAuthor : isAll;
+      li.classList.toggle("active", isMatch);
+    }
+  }
+
+  function render(list) {
+    grid.innerHTML = "";
+    for (const b of list) {
+      const a = document.createElement("a");
+      a.className = "card";
+      a.href = b.weburl;
+      a.target = "_blank";
+      a.rel = "noopener";
+
+      const cover = document.createElement("div");
+      cover.className = "cover";
+      if (b.thumbnail) {
+        const img = document.createElement("img");
+        img.src = b.thumbnail;
+        img.loading = "lazy";
+        img.alt = b.title;
+        cover.appendChild(img);
+      } else {
+        const ph = document.createElement("div");
+        ph.className = "placeholder";
+        ph.textContent = "No cover";
+        cover.appendChild(ph);
+      }
+
+      const info = document.createElement("div");
+      info.className = "info";
+      const title = document.createElement("p");
+      title.className = "title";
+      title.textContent = b.title;
+      const author = document.createElement("p");
+      author.className = "author";
+      author.textContent = b.author_mm || b.author_en || "";
+      info.appendChild(title);
+      info.appendChild(author);
+
+      a.appendChild(cover);
+      a.appendChild(info);
+      grid.appendChild(a);
+    }
+    empty.style.display = list.length ? "none" : "block";
+    countEl.textContent = `${list.length} of ${books.length} books`;
+  }
+
+  function applyFilter() {
+    const q = search.value.trim().toLowerCase();
+    const filtered = books.filter((b) => {
+      if (selectedAuthor && authorKey(b) !== selectedAuthor) return false;
+      if (!q) return true;
+      return (
+        (b.title || "").toLowerCase().includes(q) ||
+        (b.author_mm || "").toLowerCase().includes(q) ||
+        (b.author_en || "").toLowerCase().includes(q)
+      );
+    });
+    render(filtered);
+  }
+
+  search.addEventListener("input", applyFilter);
+
+  fetch("books_data.json")
+    .then((r) => r.json())
+    .then((data) => {
+      books = data;
+      buildAuthorList();
+      render(books);
+    })
+    .catch((err) => {
+      empty.style.display = "block";
+      empty.textContent = "Failed to load books_data.json: " + err;
+    });
+</script>

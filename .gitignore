@@ -1,0 +1,5 @@
+__pycache__/
+*.log
+token_cache.bin
+test_output/
+.claude/
